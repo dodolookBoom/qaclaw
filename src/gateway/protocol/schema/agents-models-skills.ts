@@ -198,6 +198,18 @@ export const SkillsInstallParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/** Download a skill bundle URL into the agent workspace skills/ directory (e.g. desktop store). */
+export const SkillsDownloadParamsSchema = Type.Object(
+  {
+    url: NonEmptyString,
+    /** Logical skill name; used as the directory name under workspace/skills/. */
+    skillName: NonEmptyString,
+    agentId: Type.Optional(NonEmptyString),
+    timeoutMs: Type.Optional(Type.Integer({ minimum: 1000 })),
+  },
+  { additionalProperties: false },
+);
+
 export const SkillsUpdateParamsSchema = Type.Object(
   {
     skillKey: NonEmptyString,

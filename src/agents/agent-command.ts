@@ -907,8 +907,13 @@ async function agentCommandInternal(
 
     const needsSkillsSnapshot = isNewSession || !sessionEntry?.skillsSnapshot;
     const skillsSnapshotVersion = getSkillsSnapshotVersion(workspaceDir);
+    // Check if the cached snapshot is outdated (version mismatch)
+    const cachedVersion = sessionEntry?.skillsSnapshot?.version;
+    const snapshotOutdated =
+      typeof cachedVersion === "number" && cachedVersion < skillsSnapshotVersion;
+    const shouldRebuildSnapshot = needsSkillsSnapshot || snapshotOutdated;
     const skillFilter = resolveAgentSkillsFilter(cfg, sessionAgentId);
-    const skillsSnapshot = needsSkillsSnapshot
+    const skillsSnapshot = shouldRebuildSnapshot
       ? buildWorkspaceSkillSnapshot(workspaceDir, {
           config: cfg,
           eligibility: { remote: getRemoteSkillEligibility() },
@@ -917,7 +922,7 @@ async function agentCommandInternal(
         })
       : sessionEntry?.skillsSnapshot;
 
-    if (skillsSnapshot && sessionStore && sessionKey && needsSkillsSnapshot) {
+    if (skillsSnapshot && sessionStore && sessionKey && shouldRebuildSnapshot) {
       const current = sessionEntry ?? {
         sessionId,
         updatedAt: Date.now(),

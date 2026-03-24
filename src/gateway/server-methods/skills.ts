@@ -3,9 +3,14 @@ import {
   resolveAgentWorkspaceDir,
   resolveDefaultAgentId,
 } from "../../agents/agent-scope.js";
+import {
+  installSkillBundleFromUrl,
+  sanitizeSkillDirName,
+} from "../../agents/skills-install-from-url.js";
 import { installSkill } from "../../agents/skills-install.js";
 import { buildWorkspaceSkillStatus } from "../../agents/skills-status.js";
 import { loadWorkspaceSkillEntries, type SkillEntry } from "../../agents/skills.js";
+import { bumpSkillsSnapshotVersion } from "../../agents/skills/refresh.js";
 import { listAgentWorkspaceDirs } from "../../agents/workspace-dirs.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { loadConfig, writeConfigFile } from "../../config/config.js";
@@ -17,6 +22,7 @@ import {
   errorShape,
   formatValidationErrors,
   validateSkillsBinsParams,
+  validateSkillsDownloadParams,
   validateSkillsInstallParams,
   validateSkillsStatusParams,
   validateSkillsUpdateParams,
@@ -137,9 +143,70 @@ export const skillsHandlers: GatewayRequestHandlers = {
       timeoutMs: p.timeoutMs,
       config: cfg,
     });
+    // Bump skills snapshot version so existing sessions reload skills on next turn
+    if (result.ok) {
+      bumpSkillsSnapshotVersion({ workspaceDir: workspaceDirRaw, reason: "manual" });
+    }
     respond(
       result.ok,
       result,
+      result.ok ? undefined : errorShape(ErrorCodes.UNAVAILABLE, result.message),
+    );
+  },
+  "skills.download": async ({ params, respond }) => {
+    if (!validateSkillsDownloadParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid skills.download params: ${formatValidationErrors(validateSkillsDownloadParams.errors)}`,
+        ),
+      );
+      return;
+    }
+    const p = params as {
+      url: string;
+      skillName: string;
+      agentId?: string;
+      timeoutMs?: number;
+    };
+    const cfg = loadConfig();
+    const agentIdRaw = typeof p.agentId === "string" ? p.agentId.trim() : "";
+    const agentId = agentIdRaw ? normalizeAgentId(agentIdRaw) : resolveDefaultAgentId(cfg);
+    if (agentIdRaw) {
+      const knownAgents = listAgentIds(cfg);
+      if (!knownAgents.includes(agentId)) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, `unknown agent id "${agentIdRaw}"`),
+        );
+        return;
+      }
+    }
+    const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+    const result = await installSkillBundleFromUrl({
+      workspaceDir,
+      skillName: p.skillName.trim(),
+      url: p.url.trim(),
+      timeoutMs: p.timeoutMs ?? 300_000,
+      config: cfg,
+    });
+    const skillDir = sanitizeSkillDirName(p.skillName.trim());
+    // Bump skills snapshot version so existing sessions reload skills on next turn
+    if (result.ok) {
+      bumpSkillsSnapshotVersion({ workspaceDir, reason: "manual" });
+    }
+    respond(
+      result.ok,
+      {
+        ok: result.ok,
+        message: result.message,
+        skillName: skillDir,
+        stdout: result.stdout,
+        stderr: result.stderr,
+      },
       result.ok ? undefined : errorShape(ErrorCodes.UNAVAILABLE, result.message),
     );
   },

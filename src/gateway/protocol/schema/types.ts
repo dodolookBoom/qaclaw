@@ -97,6 +97,7 @@ export type ToolCatalogGroup = SchemaType<"ToolCatalogGroup">;
 export type ToolsCatalogResult = SchemaType<"ToolsCatalogResult">;
 export type SkillsBinsParams = SchemaType<"SkillsBinsParams">;
 export type SkillsBinsResult = SchemaType<"SkillsBinsResult">;
+export type SkillsDownloadParams = SchemaType<"SkillsDownloadParams">;
 export type SkillsInstallParams = SchemaType<"SkillsInstallParams">;
 export type SkillsUpdateParams = SchemaType<"SkillsUpdateParams">;
 export type CronJob = SchemaType<"CronJob">;
